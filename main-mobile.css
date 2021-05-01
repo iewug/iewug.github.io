@@ -1,0 +1,54 @@
+body {
+    margin: 10px 10%;
+    font-family: "PMingLiu";
+    font-size: small;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: left;
+    color: black;
+    background-color: #fff;
+}
+
+h1 {
+    font-size: 200%;
+}
+
+nav {
+    font-weight: bold;
+    text-align: right;
+}
+
+nav ul {
+    list-style-type: none;
+}
+
+nav ul li {
+    display: inline;
+    margin: 5px;
+    font-size: 100%;
+}
+
+nav ul li a:link, nav ul li a:visited {
+    color: #8a8a8a;
+    text-decoration: none;
+}
+
+nav ul li.selected {
+    padding: 0px 0px 5px 0px;
+    border-bottom: black 2px solid;
+}
+
+footer {
+    text-align: center;
+    margin: 5px;
+    font-size: 90%;
+}
+
+.book {
+    margin: 1px;
+    zoom: 80%;
+}
+
+.center {
+    text-align: center;
+}
