@@ -22,14 +22,30 @@
 
     <article>
         <header>
-            <h1>样例</h1>
-            <time datetime="2021-04-30">2021/04/30</time>
+            <h1>篇一、如何下载音乐（以网易云为例）</h1>
+            <time datetime="2021-05-01">2021/05/01</time>
         </header>
+        <h2>基本原理</h2>
         <p>
-            内容
+            有的时候要下载音乐，可是复杂的条款让人头大。但是我们知道在浏览器听音乐时，浏览器需要发出网络请求，服务器会返回音乐文件给本地播放。
+            我们完全可以监控所有的网络传输，便可以跳过理论上的下载流程，从而直接下载。
+            至于网络请求方面，暂时不是很懂（可能将来学会了爬虫、做出了抢课程序后会懂一点）。大概get和post是两种html的基本请求方法，而fetch是JavaScript网络请求方面的一个API。
         </p>
+        <h2>流程</h2>
+        <ol>
+            <li>打开网易云网站找到想下载的歌曲</li>
+            <li>鼠标右键->检查->选中Network</li>
+            <p><a href="pic/downloadMusic-big.png"><img class="mobile-pic" src="pic/downloadMusic1.png" alt=""></a></p>
+            <li>点击播放按钮，可以发现监视器中有大量请求操作，直接搜索m4a（网易云音乐的格式）</li>
+            <p><a href="pic/downloadMusic2-big.png"><img class="mobile-pic" src="pic/downloadMusic2.png" alt=""></a></p>
+            <li>双击该音乐文件即可</li>
+            <p><img class="mobile-pic" src="pic/downloadMusic3.png" alt=""></p>
+        </ol>
+        <h2>成果</h2>
+        <p>参见<q>实验</q>里的音乐</p>
     </article>
 
+    <!--
     <article>
         <header>
             <h1>样例</h1>
@@ -39,6 +55,7 @@
             内容
         </p>
     </article>
+    -->
 
     <footer>
         &copy; 2021, TomatoEater

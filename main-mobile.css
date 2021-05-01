@@ -1,10 +1,8 @@
 body {
-    margin: 10px 10%;
+    margin: 10px 5%;
     font-family: "PMingLiu";
     font-size: small;
-    font-weight: 400;
     line-height: 1.5;
-    text-align: left;
     color: black;
     background-color: #fff;
 }
@@ -44,9 +42,11 @@ footer {
     font-size: 90%;
 }
 
-.book {
+
+.book, .mobile-pic{
     margin: 1px;
-    zoom: 80%;
+    height: 75%;
+    width: 75%;
 }
 
 .center {
