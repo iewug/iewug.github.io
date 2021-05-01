@@ -1,7 +1,16 @@
 body {
-    font-family: "PMingLiu";
-    font-size: large;
     margin: 10px 10%;
+    font-family: "PMingLiu";
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: left;
+    color: black;
+    background-color: #fff;
+}
+
+h1 {
+    font-size: 200%;
 }
 
 nav {
@@ -16,6 +25,7 @@ nav ul {
 nav ul li {
     display: inline;
     margin: 5px 10px 5px 10px;
+    font-size: 100%;
 }
 
 nav ul li a:link, nav ul li a:visited {
@@ -48,7 +58,6 @@ footer {
 
 .book:hover {
     transition: transform 1s;
-    transform: rotate(360deg);
     -webkit-transform: rotate(360deg);
     /* Safari, Chrome, mobile Safari, and Android */
     -moz-transform: rotate(360deg);
@@ -57,4 +66,9 @@ footer {
     /* Opera */
     -ms-transform: rotate(360deg);
     /* IE 9 */
+    transform: rotate(360deg);
+}
+
+.center {
+    text-align: center;
 }
