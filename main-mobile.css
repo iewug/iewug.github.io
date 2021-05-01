@@ -42,7 +42,6 @@ footer {
     font-size: 90%;
 }
 
-
 .book, .mobile-pic{
     margin: 1px;
     height: 75%;
@@ -51,4 +50,8 @@ footer {
 
 .center {
     text-align: center;
+}
+
+.line-through {
+    text-decoration: line-through;
 }
