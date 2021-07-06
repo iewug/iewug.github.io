@@ -50,7 +50,7 @@ footer {
     font-size: 90%;
 }
 
-.book, .mobile-pic{
+.book, .mobile-pic {
     margin: 1px;
 }
 
@@ -73,4 +73,25 @@ footer {
 
 .line-through {
     text-decoration: line-through;
+}
+
+table {
+    margin: 0px auto;
+    border: thin solid black;
+    caption-side: bottom;
+    border-collapse: collapse;
+}
+
+table table th {
+    background-color: white;
+}
+
+td, th {
+    border: thin dotted gray;
+    padding: 5px;
+}
+
+img {
+    height: auto;
+    max-width: 100%;
 }

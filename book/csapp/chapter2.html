@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter2</title>
+    <link rel="stylesheet" type="text/css" href="../../main.css" media="screen and (min-width: 481px)">
+    <link rel="stylesheet" type="text/css" href="../../main-mobile.css" media="screen and (max-width: 480px)">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="../../index.html">主页</a></li>
+            <li><a href="../../about.html">关于</a></li>
+            <li class="selected"><a href="../../note.html">笔记</a></li>
+            <li><a href="../../science.html">杂记</a></li>
+            <li><a href="../../lab.html">实验</a></li>
+        </ul>
+    </nav>
+
+    <h1>第二章：信息的表示和处理</h1>
+    <p>
+        不同于原书籍，笔记从信息存储、整型编码与运算、浮点编码与运算共三节进行概括。以便加强自身记忆以及自己日后查阅。
+        总的来说，本章要研究如何在有限的空间里表示数。
+    </p>
+    <h2>2.1 信息存储</h2>
+    <h3>2.1.1 数据大小</h3>
+    <table>
+        <caption>Typical sizes (in bytes) of basic C data types</caption>
+        <tr>
+            <th colspan="2">C declaration</th>
+            <th colspan="2">Bytes</th>
+        </tr>
+        <tr>
+            <th>Signed</th>
+            <th>Unsigned</th>
+            <th>32-bit</th>
+            <th>64-bit</th>
+        </tr>
+        <tr>
+            <td>char</td>
+            <td>unsigned char</td>
+            <td>1</td>
+            <td>1</td>
+        </tr>
+        <tr>
+            <td>short</td>
+            <td>unsigned short</td>
+            <td>2</td>
+            <td>2</td>
+        </tr>
+        <tr>
+            <td>int</td>
+            <td>unsigned int</td>
+            <td>4</td>
+            <td>4</td>
+        </tr>
+        <tr>
+            <td>long</td>
+            <td>unsigned long</td>
+            <td>4</td>
+            <td>8</td>
+        </tr>
+        <tr>
+            <td>int32_t</td>
+            <td>uint32_t</td>
+            <td>4</td>
+            <td>4</td>
+        </tr>
+        <tr>
+            <td>int64_t</td>
+            <td>uint64_t</td>
+            <td>8</td>
+            <td>8</td>
+        </tr>
+        <tr>
+            <td>char*</td>
+            <td>/</td>
+            <td>4</td>
+            <td>8</td>
+        </tr>
+        <tr>
+            <td>float</td>
+            <td>/</td>
+            <td>4</td>
+            <td>4</td>
+        </tr>
+        <tr>
+            <td>double</td>
+            <td>/</td>
+            <td>8</td>
+            <td>8</td>
+        </tr>
+    </table>
+    <p>
+        值得一提的是，char*指针在32位系统是以4字节存的，而在64位系统中是以8字节存的。
+        这是因为32位系统的虚拟内存地址是32位的，而64位系统是64位的。
+        也就是说，32位系统的最大寻址空间是2的32次方，约4GB；而64位系统寻址范围理论可上亿GB。
+        该内容应该与体系结构有关，暂时做了解即可。（P.S. 1字节byte是8位，也就是8比特bit）
+    </p>
+    <h3>2.1.2 大小端</h3>
+    <p>
+        大端模式(Big endian)，是指数据的高字节保存在内存的低地址中，而数据的低字节保存在内存的高地址中。这和我们的阅读习惯一致。
+        小端模式(Little endian)，是指数据的高字节保存在内存的高地址中，而数据的低字节保存在内存的低地址中。
+    </p>
+    <p>
+        比如说int0x1234567储存在地址0x100，这意味着：
+    </p>
+    <table class="center">
+        <tr>
+            <th>地址</th>
+            <td>0x100</td>
+            <td>0x101</td>
+            <td>0x102</td>
+            <td>0x103</td>
+        </tr>
+        <tr>
+            <th>大端</th>
+            <td>01</td>
+            <td>23</td>
+            <td>45</td>
+            <td>67</td>
+        </tr>
+        <tr>
+            <th>小端</th>
+            <td>67</td>
+            <td>45</td>
+            <td>23</td>
+            <td>01</td>
+        </tr>
+    </table>
+    <p>
+        顺带一提，Intel的X86架构是小端模式。
+    </p>
+    <h3>2.1.3 运算</h3>
+    <h4>2.1.3.1 位级运算</h4>
+    <p>
+        位级运算就是利用布尔运算来处理比特串。常见有掩码运算，如x&0xFF保持最低位字节不变，其他字节清零。
+    </p>
+    <table class="center">
+        <caption>一些符号</caption>
+        <tr>
+            <th>逻辑运算</th>
+            <th>布尔运算</th>
+            <th>命题逻辑</th>
+        </tr>
+        <tr>
+            <td>NOT(非)</td>
+            <td>~</td>
+            <td>￢</td>
+        </tr>
+        <tr>
+            <td>AND(与)</td>
+            <td>&</td>
+            <td>^</td>
+        </tr>
+        <tr>
+            <td>OR(或)</td>
+            <td>|</td>
+            <td>∨</td>
+
+        </tr>
+        <tr>
+            <td>XOR(异或)</td>
+            <td>∧</td>
+            <td>⊕</td>
+        </tr>
+    </table>
+    <p>
+        离散应该会讲的吧。
+    </p>
+    <h4>2.1.3.2 逻辑运算</h4>
+    <p>
+        就是||、&&以及!<br>
+        返回0x01与0x00，不多赘述。
+    </p>
+    <h4>2.1.3.3 移位运算</h4>
+    <p>
+        若x的位表示为[x<sub>w-1</sub>,x<sub>w-2</sub>,...,x<sub>0</sub>]，则：
+    </p>
+    <ul>
+        <li>
+            左移x &lt;&lt; k为[x<sub>w-k-1</sub>,x<sub>w-k-2</sub>,...,x<sub>0</sub>,0,0,...,0]
+        </li>
+        <li>
+            逻辑右移x >> k为[0,0,...,0,x<sub>w-1</sub>,x<sub>w-2</sub>,...,x<sub>k</sub>]
+        </li>
+        <li>
+            算术右移x >> k为[x<sub>w-1</sub>,x<sub>w-1</sub>,...,x<sub>w-1</sub>,x<sub>w-2</sub>,...,x<sub>k</sub>]
+        </li>
+    </ul>
+    <p>
+        对于符号整数采用算术右移，无符号整数采用逻辑右移。(这与二进制补码有关，至少算术右移可以保证符号整数的正负不变)
+    </p>
+
+    <h2>2.2 整型编码与运算</h2>
+    <h3>2.2.1 整型编码</h3>
+    <p>
+        若以w长度空间储存的整型x的位表示为[x<sub>w-1</sub>,x<sub>w-2</sub>,...,x<sub>0</sub>]，则：
+    </p>
+    <ul>
+        <li>
+            若x为无符号整数，则x = Σ(i=0~w-1)2<sup>i</sup>x<sub>i</sub>
+        </li>
+        <li>
+            若x为符号整数（二进制补码），则x = -x<sub>w-1</sub>2<sup>w-1</sup> + Σ(i=0~w-2)2<sup>i</sup>x<sub>i</sub>
+        </li>
+    </ul>
+    <h3>2.2.2 整型之间的转换</h3>
+    <p>
+        核心在于位表示不变！（还是比较直观的，不高兴举例子了。总之若存储空间大小不变，那bit pattern就不变，管他有无符号；
+        若存储空间变小，那就把草率地把前面多余的比特扔掉；如果存储空间变大，如果是有符号的，就用x<sub>w-1</sub>来填充前面多出来的空间，
+        如果无符号，就用0来填充。（这里的“前面”指的是数据的高字节，也就是左边的数码
+    </p>
+    <h3>2.2.3 整型运算</h3>
+    <h4>2.2.3.1 加法运算</h4>
+    <p>
+        核心仍然在于位表示不变！加法所导致溢出的位就扔掉就好了。如[1010] + [0111] = [0001] = 1
+    </p>
+    <h4>2.2.3.2 取负数</h4>
+    <p>
+        出发点要满足：x + (-x) = 0。因此对于w长度存储空间的整数x：
+    </p>
+    <ul>
+        <li>
+            若x为无符号整数，则-x = 2<sup>w</sup> - x（x > 0时），或-x = 0（x = 0时）
+        </li>
+        <li>
+            若x为符号整数，则-x = -x （x > min），或-x = min（x = min）。其中min为w位二进制补码所能表示的最小值
+        </li>
+    </ul>
+    <h4>2.2.3.3 乘法运算</h4>
+    <p>
+        依旧还是位表示不变。无论有无符号，只需算出正确答案，再把超出储存空间的位扔掉，就OK了。真正让我们感兴趣的是通过移位运算来解决乘以常数的问题。
+    </p>
+    <p>
+        比如说：x * 6 = (x &lt;&lt; 2) + (x &lt;&lt; 1)；x * 31 = (x &lt;&lt; 5) - x
+    </p>
+    <p>
+        移位运算能被简单的实现。一般来说，编译器会自己帮我们做这种优化。
+    </p>
+    <h4>2.2.3.4 除法运算</h4>
+    <p>
+        整型除法运算都要向零方向去近似（round toward zero）。也就是说-5/2 = -2、5/2 = 2。负数向上取整，正数向下取整。
+        对于除以2的幂，我们依旧可以用移位来优化，而任意的常数却无能为力。
+    </p>
+    <p>
+        对于结果为负数的除法，为了满足向上取整，需要引入一个偏置(1 &lt;&lt; k) - 1。比如说(short)-12340/256 = -48，
+        然而-12340 >> 8 = [1100111111001100] >> 8 = [1111111111001111] = -49不满足结果。但是引入偏置后(x + (1 &lt;&lt; k) - 1) >> k
+        = [1101000011001011] >> 8 = [1111111111010000] = -48满足结果。
+    </p>
+    <h2>2.3 浮点编码与运算</h2>
+    <h3>2.3.1 IEEE浮点表示</h3>
+    <p>
+        IEEE浮点数标准是从逻辑上用三元组{S，E，M}来表示一个数V的，即V = (-1)<sup>s</sup>×M×2<sup>E</sup>。其中s(sign)是符号位，
+        M(significand)是尾数位，E(exponent)是阶码。IEEE浮点数标准规定了单精度和双精度浮点格式。C语言中分别叫float和double。s = 1为负，s = 0为正。
+        exp当作无符号整型再减去偏置Bias得到E，Bias = 2<sup>k-1</sup>-1，k是exp的位数。偏置Bias的引入为了解决负指数问题。frac为二进制小数的小数部位。
+        比如[10100,...,0] = 0.5 + 0.125 = 0.625。frac还需进行一些简单运算可得M。
+    </p>
+    <p class="center">
+        <img src="../../pic/float.jpg" alt="">
+        <img src="../../pic/double.jpg" alt="">
+    </p>
+    <p>
+        根据exp的值，编码可以分为三种类型——规格化值、非规格化值和特殊值。下以单精度浮点数为例。
+    </p>
+    <ol>
+        <li>
+            规格化值：exp既不全为0也不全为1。E = exp - Bias，M = frac + 1。
+        </li>
+        <li>
+            非规格化值：exp全为0。E = 1 - Bias，M = frac。可以表示0以及接近0的数。
+        </li>
+        <li>
+            特殊值：exp全为1。若frac全为零，V表示无穷大；若frac不全为零，V是NaN(not a number)。
+        </li>
+    </ol>
+    <p>
+        顺带一提，之所以让非规格化的E为1-Bias而不是-Bias是为了数较小的非规格化数集到数较大的规格化数集的平稳过渡。
+    </p>
+    <h3>2.3.2 浮点数的舍入</h3>
+    <p>
+        默认采用向偶舍入的方法。就是四舍六入五凑偶，与物理实验数据处理一致。不赘述了。
+    </p>
+    <h3>2.3.3 浮点数的运算</h3>
+    <p>
+        浮点数的运算不满足结合律和分配律。（认为例子中的1e20为float）如：(3.14 + 1e20) - 1e-20 = 0.0，而3.14 + (1e20 - 1e20) = 3.14；1e20 * (1e20 -
+        1e20) = 0，而1e20 * 1e20 - 1e20 * 1e20 = NaN。总之，浮点运算难免会产生精度上的误差。
+    </p>
+
+    <footer>
+        &copy; 2021, TomatoEater
+        <br>
+        All trademarks and registered trademarks appearing on
+        this site are the property of their respective owners. ( :
+    </footer>
+</body>
+
+</html>
