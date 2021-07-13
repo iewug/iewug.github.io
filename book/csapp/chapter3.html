@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter3</title>
+    <link rel="stylesheet" type="text/css" href="../../main.css" media="screen and (min-width: 481px)">
+    <link rel="stylesheet" type="text/css" href="../../main-mobile.css" media="screen and (max-width: 480px)">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="../../index.html">主页</a></li>
+            <li><a href="../../about.html">关于</a></li>
+            <li class="selected"><a href="../../note.html">笔记</a></li>
+            <li><a href="../../science.html">杂记</a></li>
+            <li><a href="../../lab.html">实验</a></li>
+        </ul>
+    </nav>
+
+    <h1>第三章：程序的机器级表示</h1>
+    <p>
+        我们知道C源程序经过预处理、编译、汇编和链接生成了最终的可执行文件，而本章研究的对象就是源程序(*.c)经过预处理和编译后生成的汇编程序(*.s)。
+        而处理器看上去就是照着汇编程序在运行（实际上会有乱序执行等操作）。在正式开始整理前，还应当有一些初步的认识。
+    </p>
+    <p>
+        首先，csapp第三版采用的汇编语言是x86-64指令集，本整理自然也是采用x86-64指令集。由于x86-64指令集是向后（下）兼容（backward compatible 
+        也就是说，Intel保证老版本CPU的指令集新版本一定还保留着，这种只增加不删除的策略，保证了我们换CPU时，不需要更换很多软件），
+        于是x86-64指令集显得冗杂繁琐。当下比较热门的指令集RISC-V则是一种精简指令集，具有架构简单的特点。但是现在主流电脑仍是x86-64和ARM架构，学习一些X86-64指令还是有必要的。
+        顺带一提，x86-64指令还有ATT风格和Intel风格，gcc默认生成ATT风格，csapp也是采用了ATT风格。
+    </p>
+    <p>
+        其次，理应要掌握三个重要工具（操作系统：linux；指令集架构：x86-64）。
+    </p>
+    <ol>
+        <li>利用gcc生成汇编程序(*.s)：gcc -Og -S test.c<br>
+        利用gcc生成目标程序(*.o)：gcc -Og -c test.c</li>
+        <li>利用objump反编译目标文件：objdump -d test.o</li>
+        <li>使用gdb调试器：可惜不会</li>
+    </ol>
+    <p>
+        接下来从两个重要概念入手，学习汇编指令，实现控制（control）和过程（procedure），最后再一瞥浮点代码。
+    </p>
+
+    <h2>3.1 两个重要概念——寄存器与运行时栈</h2>
+    <h3>3.1.1 寄存器（register）</h3>
+    <p>
+        CPU中的算术逻辑单元（ALU，arithmetic/logic unit）只负责运算，而ALU直接访问的数据来自CPU中的寄存器们。
+        但是寄存器大小有限，更多的数据要存储在内存里。于是要有内存和寄存器进行数据交换。为了更快进行数据交换，需要设计缓存（cache）。
+        一般有三级缓存，寄存器是一级缓存的缓存，一级缓存和二级缓存又分别是二级缓存和三级缓存的缓存。三级缓存则是主（内）存的缓存。
+        各级缓存读写速度和价格区别是直观的，也不赘述了。
+    </p>
+    <p>下面讨论寄存器们：</p>
+    <h4>1）整型寄存器</h4>
+    <p class="center"><img src="../../pic/csapp/integer register.jpg" alt=""></p>
+    <p>
+        如上图所示，x86-64的CPU有十六个64位的整型寄存器。对于它们的低位字节也有各自的名称。每个寄存器有着特定的职能：%rsp（栈指针stack pointer）一直指向运行时栈的顶端；
+        %rax是储存返回值的，汇编程序中ret指令就返回%rax中的值；1st——6th argument存储函数的参数（对于那些多于六个的参数需要利用栈来存储）；
+        callee saved“被调用者保存”也就是被调用者（子函数）自己想办法帮调用者（父函数）进行备份，具体方法就是子函数在覆盖他们之前，先进行入栈备份，等子函数返回时，再出栈还原父函数运行时这些寄存器上的旧值；
+        caller saved“调用者保存”也就是调用者（父函数）视情况备份好数据，否则可能会被被调用者（子函数）所修改。
+        特别的，%rbp还有帧指针（frame pointer）的功能，即指向栈帧的最高地址，但是只有变长栈帧才会使用帧指针。
+    </p>
+    <p>对于操作数格式（operand form）有如下的约定：</p>
+    <p class="center"><img src="../../pic/csapp/operand forms.png" alt=""></p>
+    <p>
+        举例来说$0x100就是0x100，r<sub>a</sub>就是r<sub>a</sub>存的值，0x100则是在0x100地址上存的值，0x1(%rax,%rdx,4)就是在1+%rax+4*%rdx地址上存的值。注意这里的寄存器大小都是64位的。
+    </p>
+    <h4>2）条件码寄存器</h4>
+    <p>
+        除了整型寄存器，CPU还包含了一组单个位的条件码寄存器（a set of single-bit condition code registers），用来描述算术逻辑运算。
+        本章共提及了五个条件码：
+    </p>
+    <ul>
+        <li>CF：进位标志(carry flag)：运算产生进位置为1，否则为0</li>
+        <li>ZF：零标志(zero flag)：结果为零置为1，否则为0</li>
+        <li>SF：符号标志(sign flag)：结果为负置为1，否则为0</li>
+        <li>OF：溢出标志(overflow flag)：补码运算溢出置为1，否则为0</li>
+        <li>PF：奇偶标志(parity flag)：结果低8位1的个数为偶置为1，否则为0。特别的，在浮点数比较中，若有数是NaN则置为1</li>
+    </ul>
+    <p>
+        举例来说，判断有符号数A>B，就是判断B-A运算的SF^OF。事实上条件码并不能被我们直接访问，学习汇编语言也不用掌握条件指令背后的条件码。
+    </p>
+    <h4>3）YMM寄存器</h4>
+    <p>
+        csapp介绍的浮点体系结构是AVX2指令集，将浮点数存在YMM的低32位(for float)或者64位中(for double)。书上还称这些寄存器叫媒体寄存器（media register）（似乎YMM寄存器本意是为了处理图像影像的
+    </p>
+    <p class="center"><img src="../../pic/csapp/media register.png" alt=""></p>
+    <h4>4）%rip寄存器</h4>
+    <p>
+        CPU利用PC(program counter 程序计数器)来记录下一条指令的位置，而存储的寄存器就叫%rip。
+    </p>
+    <h3>3.1.2 运行时栈（run-time stack）</h3>
+    <p>
+        内存中如何储存数据，其中一个模型是堆，处理动态内存分配（如malloc），csapp并没有在第三章涉及，而是放在了第九章虚拟内存里。
+        另一个模型便是栈帧（stack frame），如下图所示：
+    </p>
+    <p class="center"><img src="../../pic/csapp/stack_frame.png" alt=""></p>
+    <ul>
+        <li>
+            saved register：当父函数的寄存器值传入子函数时，子函数便可利用该区域对寄存器值进行备份，以便在返回父函数时，寄存器值不变。
+        </li>
+        <li>
+            local variable：用来存储子函数所需的局部变量，当返回父函数时，这些变量消亡。
+        </li>
+        <li>
+            argument build area：对于以及无法用1st-6th argument register来完全存储的参数，需要在该区域存储。也就是为什么父函数的argument是从7开始编号。
+        </li>
+        <li>
+            return address：当ret指令后，PC将指向该区域储存的地址。
+        </li>
+    </ul>
+    <p>
+        值得注意的是，运行时栈的栈顶在低地址位。此外应该指出，很多函数是没有完整的栈帧结构的，因为没有必要。
+    </p>
+
+    <h2>3.2 基本指令一览</h2>
+    <h3>3.2.1 MOV</h3>
+    <h4>1）源和目的大小匹配</h4>
+    <p class="center"><img src="../../pic/csapp/mov1.jpg" alt=""></p>
+    <p><strong>注意：</strong></p>
+    <ul>
+        <li>b：8位；w：16位；l：32位；q：64位。</li>
+        <li>两个操作数不能同时为内存地址。如果要在两个内存位置传输数据，必须用一个寄存器进行中转。</li>
+        <li>使用到的寄存器大小一定要和指令最后一个字符指定的大小匹配。</li>
+        <li>movl以寄存器为目的时，会将寄存器的高位4字节置0。</li>
+        <li>如果用movq来传输立即数时，该立即数只能表示为32位补码，然后扩展到64位的值。而movabsq能够以任意64位立即数作为源操作数，并且只能以寄存器作为目的。</li>
+    </ul>
+    <h4>2）源和目的大小不匹配</h4>
+    <p class="center"><img src="../../pic/csapp/mov2.jpg" alt=""></p>
+    <p><strong>注意：</strong></p>
+    <ul>
+        <li>不存在movzlq，可以直接使用movl。因为当使用movl传输数据到32位目的寄存器中时， 会自动将目的寄存器的高位4字节置零。</li>
+        <li>cltq没有操作数，总是以%eax作为源寄存器，以%rax作为目的寄存器，等价于movslq %eax,%rax。</li>
+    </ul>
+    <h3>3.2.2 pushq和popq</h3>
+    <p class="center"><img src="../../pic/csapp/pushpop.jpg" alt=""></p>
+    <h3>3.2.3 算术和逻辑操作</h3>
+    <p class="center"><img src="../../pic/csapp/arithmetic_operation.jpg" alt=""></p>
+    <p><strong>注意：</strong></p>
+    <ul>
+        <li>leaq(load effective address)是将S计算出的地址赋给寄存器D（D必须是寄存器）。如leaq Imm(%rax, %rbx, s), %rcx就是将Imm+%rax+s*%rbx保存到%rcx；而Imm(%rax, %rbx, s), %rcx就是将Imm+%rax+s*%rbx的地址上的值保存到%rcx</li>
+        <li>一元操作符中，操作数可以是寄存器也可以是内存地址。二元操作符中，第一个操作数可以是立即数、寄存器或内存地址；第二个操作数可以是寄存器或内存地址。</li>
+        <li>移位操作中，第一个操作数可以是立即数或放在寄存器%cl中，第二个操作数可以是寄存器或内存位置。移位操作对w位长的数据值进行操作时，移位量由%cl的低log<sub>2</sub>w位决定。
+        也就是说salb只考虑低三位的值、salw低四位、sall低五位、salq低六位。</li>
+        <li>特别的如果移位操作只有一个操作数，默认移动1位</li>
+        <li>以上指令除了leaq不会设置条件码，其他都会设置</li>
+    </ul>
+    <h3>3.2.4 128位乘法和除法</h3>
+    <p class="center"><img src="../../pic/csapp/mul_div.jpg" alt=""></p>
+    <p><strong>注意：</strong></p>
+    <ul>
+        <li>R[%rdx]:R[%rax]表示将两个寄存器的值拼接起来作为一个数。</li>
+        <li>上图操作只有一个操作数。</li>
+    </ul>
+
+    <h2>3.3 控制（control）</h2>
+    <p>
+        之前提到条件码无法被直接访问，也就是说我们不能直接获取CF、OF这些条件码的值。但是可以通过CMP和TEST指令来设置条件码且不修改寄存器，接着通过以下三种方法来利用条件码：
+        （1）通过SET使一个字节为0或1；（2）通过jump实现跳转；（3）通过CMOV是实现条件数据传送。利用这些条件控制指令，可以实现if、while、for、switch等语句。
+    </p>
+    <h3>3.3.1 CMP和TEST</h3>
+    <ul>
+        <li>
+            CMP S1, S2：用来比较S1和S2，根据S2-S1的结果来设置条件码。主要用来比较两个数的大小。
+        </li>
+        <li>
+            TEST S1, S2：用来测试S1和S2，根据S1 & S2的结果来设置条件码。testq %rax, %rax可以检查%rax是正数、负数还是0。
+        </li>
+    </ul>
+    <h3>3.3.2 SET</h3>
+    <p>在执行完CMP和TEST就可以利用SET指令来修改低位单字节寄存器了，然后在利用movl指令将结果再保存在32位寄存器里。注意这些指令都有同义词，就是两个含义相同。</p>
+    <p class="center"><img src="../../pic/csapp/SET.jpg" alt=""></p>
+    <h3>3.3.3 jump</h3>
+    <p class="center"><img src="../../pic/csapp/jump.jpg" alt=""></p>
+    <p><strong>注意：</strong></p>
+    <ul>
+        <li>直接跳转，如jmp .L2下一条指令便从.L2:处开始。间接跳转，如jmp *%rax跳转到%rax所存的地址，再如jmp *(%rax)跳转到内存地址(%rax)上所存的地址</li>
+        <li>无条件跳转jmp；其他的均为有条件跳转。注意条件跳转必为直接跳转。</li>
+        <li>对于直接跳转的跳转目标有两种编码方式：1）PC相对的（PC-relative）：跳转目标地址减去跳转指令下一条指令的地址的差。编码长度可以为1、2或4字节。最常用的编码方式。2）绝对地址：用4字节直接给定目标地址。</li>
+    </ul>
+    <h3>3.3.4 CMOV</h3>
+    <p class="center"><img src="../../pic/csapp/cmov.jpg" alt=""></p>
+    <p><strong>注意：</strong></p>
+    <ul>
+        <li>不同于MOV显式声明了bwlq四个操作数长度，CMOV通过目的寄存器名字隐式推断</li>
+        <li>目的必须是寄存器</li>
+    </ul>
+    <h3>3.3.5 if 条件分支</h3>
+    <p>
+        实现条件分支有两个方法——条件控制（conditional control）与条件传送（conditional move）。具体如下面计算x与y的绝对值：
+    </p>
+    <p class="center"><img src="../../pic/csapp/controlVSmov.jpg" alt=""></p>
+    <p>
+        实际情况下生成的汇编程序将如代码c所示。处理器在执行一条指令时，会经历一系列过程，而每个过程执行所需操作的一小部分，
+        通过重叠连续指令可以提高性能，这个方法称为流水线（Pipelining）。
+        但是当遇到条件需要跳转时，只有知道跳转结果才能确定指令顺序，才能使用流水线。现在处理器采用分支预测的方法来预测跳转的结果，
+        即处理器会预测当前跳转的结果，然后将预测的指令进行流水线。如果预测正确则会提高性能，如果预测错误，就需要把之前流水线清空，
+        然后在正确的分支重新开始流水线，会损失很多性能。条件控制的方法就会存在这个问题，由于存在不确定的跳转，
+        所以处理器会通过分支预测来将填满流水线，如果分支预测错误，就使得性能受损。而用条件传送来实现条件分支，不会先判断跳转，
+        而是先将两个分支的结果进行计算，将结果分别保存在两个寄存器中，然后再通过条件传送指令CMOV将正确结果传送到输出的寄存器中。
+    </p>
+    <h3>3.3.6 do-while与while</h3>
+    <h4>do-while举例</h4>
+    <p class="center"><img src="../../pic/csapp/doWhile.jpg" alt=""></p>
+    <h4>while法一：jump_to_middle</h4>
+    <p class="center"><img src="../../pic/csapp/jumpToMid.jpg" alt=""></p>
+    <h4>while法二：guarded_do</h4>
+    <p class="center"><img src="../../pic/csapp/guardedDo.jpg" alt=""></p>
+    <h3>3.3.7 for</h3>
+    <p>可以翻译成while循环，化归成3.3.6。不赘述了。</p>
+    <h3>3.3.8 switch</h3>
+    <p>
+        如果case较少或者case的跨度很大，switch汇编后会采用if else来执行。但如果case比较集中，gcc会生成跳转表（jump table）来实现switch语句。
+        通过跳转表，switch能直接根据跳转表获得代码块地址，使得执行switch语句的时间与分支数目无关。如下例所示：
+    </p>
+    <p><strong>源程序</strong>：</p>
+    <p class="center"><img src="../../pic/csapp/switch1.jpg" alt=""></p>
+    <p><strong>汇编程序</strong>：</p>
+    <p class="center"><img src="../../pic/csapp/switch2.jpg" alt=""></p>
+    <p>在汇编程序的角落里可以找到的<strong>跳转表</strong>：</p>
+    <p class="center"><img src="../../pic/csapp/switch3.jpg" alt=""></p>
+
+    <h2>3.4 过程（procedure）</h2>
+    <p>
+        3.4节研究函数P调用函数Q，函数Q再返回函数P这一过程。主要包含三个机制：
+    </p>
+    <ul>
+        <li>传递控制：在进入函数Q的时候，程序计数器要设置为Q的代码的起始位置。从函数Q返回时，要把程序计数器设置为P中调用Q后面那条指令的地址，即从P中的断点处继续执行。</li>
+        <li>传递数据：函数P必须能够向函数Q传递一个或多个参数，而函数Q必须能够向函数P返回一个值。</li>
+        <li>分配和释放内存：开始时，函数Q可能需要为局部变量分配空间，而在返回前，又要释放这些存储空间。</li>
+    </ul>
+    <h3>3.4.1 call与ret</h3>
+    <ul>
+        <li>call Label：将返回地址A压入栈（在return address区域），PC置为Q的开头，%rsp加8</li>
+        <li>ret：弹出栈顶地址A，并将PC置为A，%rsp减8</li>
+    </ul>
+    <h3>3.4.2 一个关于local variables & argument build area的详细例子</h3>
+    <p>
+        <img src="../../pic/csapp/call_proc.jpg" alt="">
+        <img src="../../pic/csapp/proc.jpg" alt="">
+    </p>
+    <p>下面开始详细分析调用函数call_proc()后发生的复杂故事。</p>
+    <p class="center"><img src="../../pic/csapp/explanation.jpg" alt=""></p>
+    <p>
+        如上图所示，call_proc的第2行将%rsp减32字节，给栈帧分配了空间。随后3-6行建立了local variables区域，7-9行建立了argument build area，10-15行设置了六个参数寄存器。
+        一个call proc指令把PC置到proc代码的第一行，%rsp减8，存上call_proc第17行代码的地址。
+        在proc里利用六个参数寄存器和call_proc栈帧中的argument build area的值进行计算，修改了call_proc栈帧中的local variables。
+        一个ret将PC置为call_proc的第17行，%rsp加8回到call proc前的位置。
+        随后call_proc利用内存中修改过的数据进行计算，将最后的计算结果于第23行存到了%rax中。
+        最后%rsp加32字节，释放call_proc的栈帧空间。一个ret将会回到call_proc的父函数。
+    </p>
+    <h3>3.4.3 一个关于saved register的简单例子</h3>
+    <p class="center"><img src="../../pic/csapp/savedRegister.jpg" alt=""></p>
+    <p>显见在分配空间前利用pushq可以保存register在saved register区域。释放内存后再popq回去，register又变成最初的样子了。</p>
+    <h3>3.4.4 变长栈帧介绍</h3>
+    <p>
+        之前所有介绍的栈帧的申请，编译器都能提前知道栈帧的大小，从而可以直接分配一个固定大小的区域。但是对于一些栈大小是变化的函数，就需要支持变长栈帧。
+        比如说函数f(long n){long a[n];}这样子的函数就无法提前分配内存。为了管理变长栈帧，x86-64代码使用%rbp作为帧指针。进入函数时，先将其存入到register saved，然后将当前的栈指针%rsp的值赋予%rbp，
+        则函数最后可直接通过将%rbp的值赋予%rsp就能释放变长的栈帧，并且通过register saved来重置%rbp的值。具体例子就略去。
+    </p>
+    <p>
+        这么说来当初程序设计课上说定义数组大小一定要用常量（i.e. int n; cin>>n; int a[n];是错误的，应该用int *a = new[n]）果然不完全正确。现代编译器应该能通过变长栈帧来处理这个问题。
+        当初认为是编译器会自己把它翻译成new指令也是想当然了。不过古董编译器可能的确不支持int a[n]的操作。
+    </p>
+    <h2>3.5 浮点</h2>
+    <p>
+        csapp介绍的浮点数用了AVX2指令集。浮点数的在机器级表示的层次上，与整型和指针有很大的不同。我也不整理了，移步<a href="https://blog.csdn.net/WarEric/article/details/79963930" target="_blank">csdn</a>。
+    </p>
+    <h2>3.6 其他</h2>
+    <p>
+        第三章还介绍了许多东西，这里也略带一提。
+    </p>
+    <h3>3.6.1 内存越界引用和缓冲区溢出（buffer overflow）</h3>
+    <p>
+        主要讲了类似声明为char a[3]的a数组，调用者却访问或者修改了a[5]的数据。程序的堆栈是缓冲区的一种。如果攻击者可以利用缓冲区溢出，写攻击代码(exploit code)覆盖了一些其他内存空间的数据，
+        使得攻击者获取了被攻击主机的控制权。csapp讲了三种应对措施。<strong>1）stack randomization</strong>：同一份代码在不同时间不同电脑的栈帧空间地址不同；
+        <strong>2）stack corruption detection</strong>：在该函数栈帧中的局部变量区与栈状态（返回地址和寄存器保存区）之间存入一个随机的金丝雀值（Canary），然后在恢复寄存器状态和返回返回地址之前，会检测该值是否发生变化，如果发生变化，则程序异常终止。
+        比如：movq %fs:40, %rax把canary值赋到%rax中；再把%rax赋到栈帧上；一些指令后，把栈帧该处的值赋会%rax；最后xorq %fs:40, %rax可以检测canary值是否被修改。
+        <strong>3）limiting executable code regions</strong>：使用只读的内存区。
+    </p>
+    <h3>3.6.2 数据对齐</h3>
+    <p>
+        Suppose a processor always fetched 8 bytes from memory with an address that must be a multible of 8. If we can guarantee that any double will be aligned to have its address be a multiple of 8, then the value can be read or wirtten with a single operation.
+        于是乎可以得到<strong>对齐原则：</strong>任何K字节的基本对象的地址必须是K的倍数。
+    </p>
+    <p>
+        对于struct，编译器可能会在中间插入空袭，来满足各自对内存地址的要求。考虑struct S{int i; char c; int j;}; S的内存分配将如下：
+    </p>
+    <table class="center">
+        <tr>
+            <th>offset</th>
+            <td>0</td>
+            <td>1</td>
+            <td>2</td>
+            <td>3</td>
+            <td>4</td>
+            <td>5</td>
+            <td>6</td>
+            <td>7</td>
+            <td>8</td>
+            <td>9</td>
+            <td>10</td>
+            <td>11</td>
+        </tr>
+        <tr>
+            <th>contents</th>
+            <td colspan="4">i</td>
+            <td>c</td>
+            <td colspan="3">/</td>
+            <td colspan="4">j</td>
+        </tr>
+    </table>
+    <footer>
+        &copy; 2021, TomatoEater _(:3」∠)_<!--md，这章也太多了-->
+        <br>
+        All trademarks and registered trademarks appearing on
+        this site are the property of their respective owners. ( :
+    </footer>
+</body>
+
+</html>
