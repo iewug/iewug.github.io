@@ -1,12 +1,33 @@
-<!DOCTYPE html>
+<!--为什么要去掉<!DOCTYPE html>才行-->
 <html lang="zh">
-    
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>实验</title>
     <link rel="stylesheet" type="text/css" href="main.css" media="screen and (min-width: 481px)">
     <link rel="stylesheet" type="text/css" href="main-mobile.css" media="screen and (max-width: 480px)">
+    <script>
+        var xleft = 0;
+        var ytop = 0;
+        var movex = 1.5;
+        var movey = 1.5;
+        function move() {
+            xleft += movex;
+            ytop += movey;
+            var xgg = document.getElementById("xgg");
+            xgg.style.top = ytop;
+            xgg.style.left = xleft;
+            if (xleft + xgg.offsetWidth >= document.body.clientWidth || xleft <= 0) {
+                movex = -movex;
+            }
+            if (ytop + xgg.offsetHeight >= document.body.clientHeight || ytop <= 0) {
+                movey = -movey;
+            }
+
+        }
+        setInterval(move, 10);
+    </script>
 </head>
 
 <body>
@@ -19,12 +40,21 @@
             <li class="selected">实验</li>
         </ul>
     </nav>
-    <h1>就先来段音乐吧</h1>
     <p>
-        不要脸的帮你打开了autoplay，并且关掉了控件~
         <audio autoplay="autoplay" src="music/love you like the movies.m4a">love you like the movies</audio>
     </p>
-
+    <div id="xgg" style="position: absolute;left: 0px;top: 0;">
+        <strong>
+            <pre>
+            　☆ *　. 　☆
+            　　. ∧＿∧　∩　* ☆ 小朋友加油嗷！！！
+            * ☆ ( ・∀・)/ .
+            　. ⊂　　 ノ* ☆
+            ☆ * (つ ノ .☆
+            　　 (ノ
+        </pre>
+        </strong>
+    </div>
     <footer>
         &copy; 2021, TomatoEater
         <br>
