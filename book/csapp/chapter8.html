@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter8</title>
+    <link rel="stylesheet" type="text/css" href="../../main.css" media="screen and (min-width: 481px)">
+    <link rel="stylesheet" type="text/css" href="../../main-mobile.css" media="screen and (max-width: 480px)">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="../../index.html">主页</a></li>
+            <li><a href="../../about.html">关于</a></li>
+            <li class="selected"><a href="../../note.html">笔记</a></li>
+            <li><a href="../../science.html">杂记</a></li>
+            <li><a href="../../lab.html">实验</a></li>
+        </ul>
+    </nav>
+
+    <h1>第八章：异常控制流</h1>
+    <p>
+        处理器上电后，PC就假定一个序列a0, a1,..., an-1，其中ak是指令Ik的地址。
+        从ak转变到ak+1的过程称为<strong>控制转移（Control Transfer）</strong>，将控制转移序列称为<strong>控制流（Flow of Control或Control
+            Flow）</strong>。
+        当每个Ik与Ik+1的地址在内存是相邻的，则称该控制流是<strong>平滑（smooth）</strong>的，否则存在<strong>突变（abrupt change）</strong>，比如分支跳转或函数调用。
+    </p>
+    <p>
+        系统会通过使控制流发生突变，来对系统状态的变化做出反应，比如必须处理硬件定时器定期产生的信号、必须将到达网络适配器的数据包存放在内存等等。
+        这种突变称为<strong>异常控制流（Exceptional Control Flow，ECF）</strong>。而一次<strong>异常（exception）</strong>就是指一个突变。ECF存在不同的层次：
+    </p>
+    <ul>
+        <li>
+            <strong>硬件层次</strong>：Events detected by the hardware trigger abrupt control transfer to <strong>exception
+                handlers（异常处理程序）</strong>
+        </li>
+        <li>
+            <strong>操作系统层次</strong>：内核通过<strong>上下文切换（context switch）</strong>将控制从一个用户进程转移到另一个用户进程
+        </li>
+        <li>
+            <strong>应用层次</strong>：进程发送<strong>信号（signal）</strong>到另一个进程，而接受者会将控制转移到它的<strong>信号处理程序（signal
+                handler）</strong>。
+            此外，程序还可以<strong>非本地跳转（nonlocal jump）</strong>到任意其他函数的地址，以应对异常。
+        </li>
+    </ul>
+    <p>
+        于是本章的关键词有：
+    </p>
+    <ol>
+        <li><strong>异常（exception）</strong>。异常位于硬件和操作系统交接的部分，由硬件和操作系统共同实现。</li>
+        <li><strong>系统调用（system call）</strong>。系统调用是一种能提供应用进入操作系统的异常。</li>
+        <li><strong>进程（process）</strong>与<strong>信号（signal）</strong>。进程与信号位于应用与操作系统交接的部分。</li>
+        <li><strong>非本地跳转（nonlocal jump）</strong>。一种应用层次的ECF。</li>
+    </ol>
+
+    <h2>8.1 异常</h2>
+    <h3>8.1.1 异常处理</h3>
+    <p>
+        在计算机开机后，操作系统分配并初始化了一个叫做<strong>异常表（exception table）</strong>的跳转表，异常表中的条目k存放着该异常的异常处理程序的地址。
+        在运行中，如果处理器检测到了处理器状态（state）的改变（称为<strong>事件event</strong>），那么处理器会决定它的异常，并通过异常表来调用相应的异常处理程序。
+        当异常处理器处理完后，程序可能回到发生异常的当前指令，或者回到下一指令，或者直接异常退出。
+    </p>
+    <p>
+        每一种异常都有唯一的<strong>非负异常号（exception number）</strong>。异常表的起始地址保存在特殊的CPU寄存器中，称为异常表基址寄存器（Exception Table Base Register）。
+        当处理器检测到有事件发生时，并确定了异常号k时，就会通过异常号确定偏移量。比如在64位系统中，内存地址为8字节，则偏移量为8k字节。
+        处理器接着通过异常表基址寄存器保存的异常表起始地址，加上偏移量来得到异常处理程序的内存地址，然后跳转到对应的异常处理程序。
+    </p>
+    <p>异常有以下几点不同于过程调用（procedure call，就是chapter3中的call）：</p>
+    <ul>
+        <li>
+            处理器压入栈的返回地址可能是当前指令或者是下一条指令。
+        </li>
+        <li>
+            处理器会将一些额外的处理器状态压入栈中，使得当处理器返回时，能从栈中返回中断程序原始的状态。
+        </li>
+        <li>
+            如果控制从用户程序转移到内核，则这些数据都保存在内核栈中，而不是用户栈。
+        </li>
+        <li>
+            异常处理程序运行在内核模式下，使得它们对所有系统资源都有完全的访问权限。
+        </li>
+    </ul>
+    <p>
+        可以看出，异常由处理器检测，再由内核来处理。因此说异常位于硬件和操作系统交接的部分，由硬件和操作系统共同实现。下面进一步讨论四类异常。
+    </p>
+    <h3>8.1.2 异常类型</h3>
+    <table>
+        <caption>四类异常</caption>
+        <tr>
+            <th>Class</th>
+            <th>Cause</th>
+            <th>Async/sync</th>
+            <th>Return behavior</th>
+        </tr>
+        <tr>
+            <td>Interrupt</td>
+            <td>Signal from I/O device</td>
+            <td>Async</td>
+            <td>Always return to next instruction</td>
+        </tr>
+        <tr>
+            <td>Trap</td>
+            <td>Intentional exception</td>
+            <td>Sync</td>
+            <td>Always return to next instruction</td>
+        </tr>
+        <tr>
+            <td>Fault</td>
+            <td>Potentially recoverable error</td>
+            <td>Sync</td>
+            <td>Might return to current instruction</td>
+        </tr>
+        <tr>
+            <td>Abort</td>
+            <td>Nonrecoverable error</td>
+            <td>Sync</td>
+            <td>Never return</td>
+        </tr>
+    </table>
+    <p>
+        其中，<strong>异步(asynchronous)</strong>异常是由于处理器外部发生的状态变化而引起的，而<strong>同步(synchronous)</strong>异常指的是当前指令运行的结果。
+    </p>
+    <p>
+        在Linux/x86-64中，一共有256种不同的异常，其中0~31号异常是由Intel架构师定义的异常，32~255号异常是由操作系统定义的中断和陷阱。几个比较特殊的如下所示
+    </p>
+    <table>
+        <caption>examples of exceptions in x86-64 systems</caption>
+        <tr>
+            <th>Exception number</th>
+            <th>Description</th>
+            <th>Exception class</th>
+        </tr>
+        <tr>
+            <td>0</td>
+            <td>Devide error</td>
+            <td>Fault</td>
+        </tr>
+        <tr>
+            <td>13</td>
+            <td>General protection fault</td>
+            <td>Fault</td>
+        </tr>
+        <tr>
+            <td>14</td>
+            <td>Page fault</td>
+            <td>Fault</td>
+        </tr>
+        <tr>
+            <td>18</td>
+            <td>Machine check</td>
+            <td>Abort</td>
+        </tr>
+        <tr>
+            <td>32~255</td>
+            <td>OS-defined exceptions</td>
+            <td>Interrupt or trap</td>
+        </tr>
+    </table>
+    <h4>1）中断异常（Interrupt）</h4>
+    <p>
+        中断异常是由处理器外部的I/O设备信号触发的，不是由指令造成的。I/O设备通过向处理器芯片上的中断引脚发送信号，并把异常号放在系统总线上，来触发中断。
+        当当前指令执行完后，处理器发现中断引脚的电压变高，就从系统总线中获取异常号，然后调用对应的<strong>中断处理程序（Interrupt Handler）</strong>，执行完毕后返回执行下一条指令。
+        I/O设备如网络适配器、磁盘控制器和定时器（timer）都会引起中断。
+    </p>
+    <h4>2）陷阱异常（Trap）</h4>
+    <p>
+        操作系统内核为程序提供各种服务，但是你的程序没有直接访问内核的权限，无法调用内核函数以及访问内核数据。
+        因此在用户程序和内核之间提供一个类似函数的接口，称为<strong>系统调用（system call）</strong>，用户会通过执行系统调用来向内核请求服务。
+        比如读取文件（read）、创建新进程（fork）、加载程序（execve）或终止程序（exit），所以陷阱异常是一个有意的（intentional）异常。
+    </p>
+    <p>
+        处理器提供了syscall n指令来允许用户程序请求服务n。<strong>陷阱处理程序（trap handler）</strong>就可以通过寄存器传递的参数（比如%rax存储syscall的n）来处理该陷阱。
+        C程序中也可以通过syscall函数来直接使用系统调用。然而大家更多会去使用C标准库里的包装函数（wrapper function），如下图所示。这里将系统调用和对应的包装函数称为<strong>系统级函数（system-level
+        function）</strong>。
+    </p>
+    <p class="center"><img src="../../pic/csapp/syscall.jpg" alt=""></p>
+    <p>
+        从程序员角度来看，系统调用和函数调用一样，但是两者存在巨大的区别。系统调用运行在内核模式，而函数调用运行在用户模式。
+    </p>
+    <h4>3）故障异常（Fault）</h4>
+    <p>
+        故障异常由错误引起的。当发生故障时，处理器将控制转移给<strong>故障处理程序（fault handler）</strong>，如果处理程序能修复故障，则重新执行引发中断的当前指令，否则处理程序返回到内核的abort例程，终止应用程序。
+    </p>
+    <p>
+        举例来说，在Linux/x86-64下，当应用尝试除以0时，会出现除法错误（异常0），Linux不会尝试从除法错误中恢复，而是直接终止程序，而Linux shell通常会吧除法错误报告为浮点异常（Floating
+        Exception）。
+        造成一般保护故障（异常13）的原因有很多，通常是因为程序引用了一个未定义的虚拟内存区域，或者程序试图写一个只读文件，Linux不会尝试恢复这类故障，shell中会将其报告为段故障（Segmentation Fault）。
+        遇到缺页异常（异常14），处理器会将适当的磁盘上的虚拟内存的一个页面映射到物理内存的一个页面，然后重新执行产生故障的指令。
+    </p>
+    <h4>4）终止异常（Abort）</h4>
+    <p>
+        终止异常通常是不可修复的错误造成的，通常是硬件错误，<strong>终止处理程序（abort handler）</strong>会直接将控制返回一个abort例程，终止应用程序。
+    </p>
+    <p>
+        比如在Linux/x86-64中，机器检查异常（异常18）是在导致故障的指令中检测到致命的硬件错误。
+    </p>
+
+    <h2>8.2 进程</h2>
+    <p>
+        异常是允许操作系统内核提供<strong>进程（Process）</strong>概念的基本构造块。
+    </p>
+    <p>
+        进程的经典定义是一个执行中程序的实例(an instance of a program in execution)。
+        每个程序都会运行在某个由内核维护的进程<strong>上下文（Context）</strong>中。上下文包含了保证程序正确运行所需的状态，包括存放在内存中的程序的代码和数据、栈、通用目的寄存器的内容、程序计数器、环境变量等等。
+        当我们执行可执行文件时，shell会先创建一个新的进程，给程序提供自己的上下文，然后再在该进程的上下文中运行这个可执行目标文件。
+    </p>
+    <p>进程的出现，给我们提供了一种假象——我们的程序独占地使用处理器和内存。实际上这种假象是由<strong>逻辑控制流</strong>和<strong>私有地址空间</strong>提供的。</p>
+    <h3>8.2.1 逻辑控制流</h3>
+    <p>
+        当我们单步执行程序时，可以看到一系列PC值，这个PC序列就称为逻辑控制流(logical control flow)，简称逻辑流(logical flow)。
+        注意：之前“处理器上电后，PC就假定一个序列a0, a1,..., an-1，其中ak是指令Ik的地址”中的控制流的是物理控制流，是在系统层次上的指令地址序列，而逻辑控制流是在程序级别上的，所以物理控制流包含逻辑控制流。
+    </p>
+    <p class="center"><img src="../../pic/csapp/logical control flow.jpg" alt=""></p>
+    <p>
+        如上图所示，一个物理控制流被分成了三个逻辑控制流。每条竖线代表着一个进程的逻辑控制流的一部分。三个逻辑流交错进行，轮流使用处理器。
+        当一个进程执行了一部分逻辑流时，就会被别的进程<strong>抢占（Preempted）</strong>。但是从单个进程的角度来看，它的逻辑流是连续的，这便提供了独占处理器的假象。
+    </p>
+    <p>一些概念需要明确：</p>
+    <ul>
+        <li>
+            <strong>并发流（concurrent flow）</strong>：多个逻辑流交替运行。如A与B是并发流，A与C也是并发流，但是B与C不是并发流。
+        </li>
+        <li>
+            <strong>多任务（Multitasking）</strong>：多个进程轮流运行的现象。多任务也叫时间分片（Time Slicing）。
+        </li>
+        <li>
+            <strong>时间片（Time Slice）</strong>：进程每次执行一部分逻辑流的时间。比如进程A就由两个时间片组成。
+        </li>
+        <li>
+            <strong>并行流（Parallel Flow）</strong>：在不同的处理器核或计算机上运行的并发流
+        </li>
+    </ul>
+    <h3>8.2.2 私有地址空间</h3>
+    <p>
+        进程为每个程序提供了自己的私有地址空间(private address space)，其他进程不能读或写该地址空间中的内存字节。如下是一个私有地址空间的架构：
+    </p>
+    <p class="center"><img src="../../pic/csapp/process address space.jpg" alt=""></p>
+    <h3>8.2.3 用户模式和内核模式</h3>
+    <p>处理器为进程提供了两种模式，用户模式和内核模式，处理器通过某个控制寄存器的模式位（Mode Bit）来进行切换</p>
+    <ul>
+        <li>
+            <strong>内核模式(kernel mode)</strong>：当处理器设置了模式位时，为内核模式。此时进程可以执行指令集中的所有指令，并且可以访问系统中的任何内存位置。
+        </li>
+        <li>
+            <strong>用户模式(user mode)</strong>：当处理器不设置模式位时，为用户模式，是进程的初始模式。此时进程不能执行特权指令（Privileged Instruction），
+            比如停止处理器、改变模式位或者发起I/O操作，也不能引用内核区域中的指令和数据，只能通过系统调用接口来间接访问。
+        </li>
+    </ul>
+    <p>
+        进程初始是为用户模式，当出现异常（中断、陷阱、故障）时会变为内核模式，并跳转到异常处理程序中，当返回应用程序时，又会改回用户模式。
+        为了处于用户模式的进程能访问内和数据结构的内容，Linux提供了/proc文件系统。
+    </p>
+    <h3>8.2.4 上下文切换</h3>
+    <p>
+        我们知道内核为每个进程维护了一个上下文，包含了进程所需的所有信息。
+        当进程执行出现中断或某些异常时，内核中的<strong>调度器（Scheduler）</strong>会决定抢占当前进程，并重新开始一个之前被抢断了的进程。
+        此时就需要进行<strong>上下文切换（Context Switch）</strong>，将当前进程的上下文切换成要运行的进程的上下文。
+        比如系统级函数read要从硬盘中读取数据，内核可能进行上下文切换来运行其他程序。
+        再比如每次定时器中断异常发生后。内核都可以决定要不要进行上下文切换。
+        上下文切换主要包含以下步骤：
+    </p>
+    <ol>
+        <li>保存当前进程的上下文，方便过后再进行调度</li>
+        <li>恢复之前某个被抢占进程的上下文</li>
+        <li>将控制传递给这个新恢复的进程</li>
+    </ol>
+    <p>
+        一个更加具体的例子如下：
+    </p>
+    <p class="center"><img src="../../pic/csapp/context switch.jpg" alt=""></p>
+    <p>
+        首先内核开始执行进程A，处于用户模式。当进程A调用了read系统调用时，内核中的陷阱处理程序请求来自磁盘控制器的DMA传输，并且安排磁盘在完成数据传输后中断处理器。
+        由于磁盘读取数据比较耗时，所以调度程序决定运行进程B。在上下文切换的过程中，内核先以内核模式代表进程A运行一些指令，再代表进程B运行一些指令。完成切换后，内核再在用户模式下运行进程B。
+        当磁盘控制器完成从磁盘到内存的数据传输后，磁盘会发起中断。此时内核判断进程B已运行了足够长的时间了，就会从进程B切换到进程A，直到下次异常出现。
+    </p>
+
+    <h2>8.3 进程控制</h2>
+    <h3>8.3.0 系统调用错误处理</h3>
+    <p>
+        当Unix系统级函数遇到了错误，通常会返回-1，并设置全局整型变量errno的值。为了代码的整洁，csapp写了许多包装函数来检测错误，并将其首字母大写。
+        如能检测错误的fork()版本为Fork()。下面是Fork()函数代码：
+    </p>
+    <pre>void unix_error(char *msg)
+{
+    fprintf(stderr, "%s: %s\n", msg, strerror(errno)); 
+    exit(0);
+}
+pid_t Fork(void)
+{
+    pid_t pid;
+    if((pid = fork()) &lt; 0)
+        unix_error("Fork error");
+    return pid;
+}</pre>
+<p>stderr向屏幕输出错误信息。strerror将整型errno翻译为其代表的错误。pid_t是pid的数据类型。在type.h中定义为int。</p>
+    <h3>8.3.1 获取进程ID</h3>
+    <p>
+        每个进程都有一个唯一的正数进程ID（PID）。可以通过getpid函数返回当前进程的PID，通过getppid函数返回创建当前进程的父进程PID。
+        PID的数据类型都为pid_t，Linux系统中在type.h中定义为int。
+    </p>
+    <pre>#include &lt;unistd.h>
+#include &lt;sys/types.h>
+pid_t getpid(void);
+pid_t getppid(void);</pre>
+    <h3>8.3.2 创建和终止进程</h3>
+    <p>
+        在一个程序员看来，进程会处于以下三种状态之一：
+    </p>
+    <ul>
+        <li><strong>运行(running)</strong>：进程要么在CPU上执行，要么在等待被执行且最终会被内核调度。即被抢占的进程也属于运行状态。</li>
+        <li><strong>停止(stopped)</strong>：当进程收到SIGSTOP、SIGTSTP、SIGTTIN或SIGTTOU信号时，进程的执行被挂起（Suspended）且不会被调度，直到收到SIGCONT信号，进程才会运行。即进程暂时不会被调度，但是还有可能被调度。
+        </li>
+        <li><strong>终止(terminated)</strong>：进程被永久停止了，主要原因在于：进程收到了终止进程的信号；从主程序返回；调用exit函数。</li>
+    </ul>
+    <h4>exit结束进程</h4>
+    <pre>#include &lt;stdlib.h>
+void exit(int status);</pre>
+    <p>
+        其中，status表示进程的退出状态。
+    </p>
+    <h4>fork创建子进程</h4>
+    <pre>#include &lt;unistd.h>
+#include &lt;sys/types.h>
+pid_t fork(void);</pre>
+    <p>当调用fork函数时，就立即以当前进程作为父进程，创建一个新的子进程，具有以下特点：</p>
+    <ul>
+        <li>两个进程具有相同的地址空间，意味着两个进程具有相同的用户栈、局部变量值、堆、全局变量和代码。
+            但是两者的地址空间又是独立的，所以fork函数之后对两个进程的操作都是独立的。
+            即父子进程具有执行fork函数之前相同的设置，而执行完fork函数后，两个进程就是并发独立的了。</li>
+        <li>子进程还获得与父进程任何打开文件描述符相同的副本，即子进程可以读写父进程打开的任何文件。</li>
+        <li>fork函数会有两个返回值——父进程会返回子进程的PID，而子进程会返回0。所以我们可以通过fork函数的返回值判断当前所处的进程。</li>
+    </ul>
+    <h3>8.3.3 回收子进程</h3>
+    <p>
+        当一个进程终止后，内核并不会立即将其从系统中移除。相反，进程一直会保持终止状态，直到被它的父进程回收（reap）。当父进程回收子进程时，子进程会把它的退出状态返回给父进程，然后消失。
+        那些终止但未被回收的进程叫做僵尸进程（zombie）。如果父进程终止了，但是子进程没有被回收，内核会调用init进程来回收这些子进程。因为僵尸进程会占据内存资源，主动回收子进程是有必要的。
+    </p>
+    <p>
+        可以通过waitpid函数来回收子进程。函数原型如下：
+    </p>
+    <pre>#include &lt;sys/types.h>
+#include &lt;sys/wait.h>
+pid_t waitpid(pid_t pid, int *statusp, int options); </pre>
+    <h4>等待集合pid</h4>
+    <ul>
+        <li>
+            如果pid>0，则等待集合就是一个单独的子进程，该子进程的PID就是pid
+        </li>
+        <li>
+            如果pid=-1，则等待集合就是该进程的所有子进程
+        </li>
+    </ul>
+    <p>
+        注意：当父进程创造了许多子进程，这里通过pid=-1进行回收时，子程序的回收顺序是不确定的，并不会按照父进程生成子进程的顺序进行回收。
+        可通过按顺序保存子进程的PID，然后按顺序指定pid参数来消除这种不确定性。
+    </p>
+    <h4>等待行为options</h4>
+    <ul>
+        <li>
+            0：默认选项，会挂起当前进程，直到等待集合中的一个子进程终止。函数返回该子进程的PID。
+        </li>
+        <li>
+            WNOHANG：如果等待集合中所有子进程都没有终止，立刻返回0。
+        </li>
+        <li>
+            WUNTRACED：会挂起当前进程，直到等待集合中的一个子进程终止或者停止。函数返回该子进程的PID。
+        </li>
+        <li>
+            WCONTINUED：挂起当前进程，直到等待集合中一个正在运行的子进程被终止、或者停止的子进程收到SIGCONT信号重新开始运行。
+        </li>
+    </ul>
+    <h4>检查被回收子进程的退出状态statusp</h4>
+    <p>
+        如果statusp非空，则waitpid函数会将子进程的状态信息放在statusp中，可通过wait.h中定义的宏进行解析。如下：
+    </p>
+    <ul>
+        <li>WIFEXITED(statusp)：如果子进程通过调用exit或return正常终止，则返回真。在返回真的情况下，可通过WEXITSTATUS(statusp)获得退出状态。</li>
+        <li>WIFSIGNALED(status)：如果子进程是因为一个未捕获的信号终止的，则返回真。在返回真的情况下，可通过WTERMSIG(statusp)获得该信号的编号。</li>
+        <li>WIFSTOPPED(statusp)：如果引起函数返回的子进程是停止的，则返回真。在返回真的情况下，可通过WSTOPSIG(statusp)获得引起子进程停止的信号编号。</li>
+        <li>WIFCONTINUED(statusp)：如果子进程收到SIGCONT信号重新运行，则返回真。</li>
+    </ul>
+    <h4>错误状态</h4>
+    <p>
+        如果当前进程没有子进程，则waitpid返回-1，并设置errno为ECHILD，如果waitpid函数被信号中断，则返回-1，并设置errno为EINTR。否则返回被回收的子进程PID。
+    </p>
+    <h4>简化的wait函数</h4>
+    <p>调用wait(&status)等价于调用waitpid(-1, &status, 0)</p>
+    <h3>8.3.4 休眠进程</h3>
+    <pre>#include &lt;unistd.h>
+unsigned int sleep(unsigned int secs);
+int pause(void);</pre>
+    <p>sleep函数将进程挂起一段时间，而该函数的返回值为剩下的休眠时间。</p>
+    <p>pause函数将进程挂起，直到该进程收到一个信号。pause永远返回-1。</p>
+    <h3>8.3.5 加载并运行程序</h3>
+    <pre>#include &lt;unistd.h>
+int execve(const char *filename, const char *argv[],
+           const char *envp[]);</pre>
+    <p>
+        execve函数可在当前进程的上下文中加载并运行一个程序。
+        execve函数加载并运行filename可执行目标文件，参数列表argv和环境列表envp是以NULL结尾的字符串指针数组，其中argv[0]为文件名。
+        调用exevec函数其实就是调用加载器，则加载器会在可执行目标文件filename的指导下，将文件中的内容复制到代码段和数据段，再调用_libc_start_main来初始化执行环境，调用main函数，main函数的函数原型如下所示
+    </p>
+    <pre>int main(int argc, char *argv[], char *envp[]);</pre>
+    <p>
+        其中，argc为参数数目，argv为参数列表，envp为环境列表。其用户栈的架构如下所示
+    </p>
+    <p class="center"><img src="../../pic/csapp/userstack.jpg" alt=""></p>
+    <p>这里还有一些函数用来对环境变量进行操作</p>
+    <pre>#include &lt;stdlib.h>
+//获得名字为name的环境值
+char *getenv(const char *name);
+//对环境值进行修改
+int setenv(const char *name, const char *newvalue, 
+           int overwrite);
+// 删除环境变量
+int unsetenv(const char *name); </pre>
+    <h3>8.3.6 利用fork和execve来运行程序</h3>
+    <p>
+        shell是指一种交互性的应用程序，能够代表用户运行程序。若输入的最后一个参数是一个&，那么程序将在后台（background）执行，否则在前台执行。
+        前台执行要求shell等待它的结束，后台执行则等待它的结束。csapp写了一个简易的没有回收子进程的shell，这里略去，主要就是利用fork创建新进程，execve在该进程运行程序。
+    </p>
+
+    <h2>8.4 信号</h2>
+    <p>
+        我们已经看到了硬件和软件如何协作来提供基础低层次的异常机制。我们还看到了操作系统如何利用异常来支持名为进程上下文切换的异常控制流。
+        接下来我们将研究一种更高层次的软件形式的异常，称为Linux信号。信号允许进程和内核中断其他进程。
+    </p>
+    <p>
+        信号就是一条小消息，可以通知系统中发生了一个某种类型的事件。内核中异常处理程序处理低层次的硬件异常往往是对用户进程是不可见的，但是可以通过给用户进程发送信号的形式来告知。
+        比如除零错误就发送SIGFPE信号，执行非法指令就发送SIGILL信号，子进程终止内核就发送SIGHLD到父进程中，则此时父进程就能对该子进程调用waitpid来进行回收。
+        再如输入Ctrl+C，内核会发送SIGINT信号给前台作业；输入Ctrl+Z，内核会向前台作业发送SIGTSTP信号，默认停止作业，可通过发送SIGCONT信号来恢复该作业。
+    </p>
+    <p>Linux系统支持以下30种信号：</p>
+    <p class="center"><img src="../../pic/csapp/Linux signal.jpg" alt=""></p>
+    <h3>8.4.1 一些术语</h3>
+    <ul>
+        <li>
+            <strong>发送（send or deliver）信号</strong>：内核通过更新目的进程上下文中的某个状态，来表示发送了一个信号到目的进程。有两种情况导致发送信号：（1）内核检测到了系统事件如除以0和子进程终止。
+            （2）kill函数显式地要求内核发送信号给进程。
+        </li>
+        <li>
+            <strong>接收（receive）信号</strong>：当目的进程被内核强迫以某种方式对信号的发送做出反应时，它就接受了信号。进程可以忽略信号、终止进程，或执行用户级（你写的）的信号处理程序（Signal Handler）来捕获信号。
+        </li>
+        <li>
+            <strong>待处理信号（pending signal）</strong>：已经被发送但是还没被接收的信号。内核为每个进程在pending位向量中维护待处理信号的集合。当信号k被发送后，内核设置目标进程的pending位向量的位k；当信号k被接收后，位k被清除。
+            同一种信号至多存在一个待处理信号。如果进程已经存在了待处理信号k，接下来收到的信号k会被丢弃，而不是接收。
+        </li>
+        <li>
+            <strong>阻塞（block）信号</strong>：被阻塞的信号可以被发送但是无法被接收，从而产生待处理信号。直到进程取消阻塞（unblock）该信号，它才能被接收。
+        </li>
+    </ul>
+    <p>
+        接下来逐一分析发送信号、接收信号、阻塞信号以及信号处理程序。
+    </p>
+    <h3>8.4.2 发送信号</h3>
+    <h4>进程组</h4>
+    <p>
+        Unix基于进程组（Process Group）的概念，提供了大量向进程发送信号的机制。
+        进程组由一个正整数进程组ID来标识，每个进程组包含一个或多个进程，而每个进程都只属于一个进程组，默认父进程和子进程属于同一个进程组。
+        我们将shell为了对一条命令行进行求值而创建的进程称为作业（Job）。比如输入ls | sort命令行，就会创建两个进程，分别运行ls程序和sort程序，这两个进程通过Unix管道连接到一起，由此就得到了一个作业。注意：
+    </p>
+    <ul>
+        <li>任何时刻，最多只有一个前台作业和任意数量的后台作业。</li>
+        <li>shell会为每个作业创建一个独立的进程组，该进程组ID由该作业中任意一个父进程的PID决定。</li>
+    </ul>
+    <p>这里提供了以下对进程组的操作，允许你可以同时给一组进程发送信号。</p>
+    <pre>#include &lt;unistd.h>
+pid_t getpgrp(void); //返回所在的进程组
+int setpgip(pid_t pid, pid_t pgid); //设置进程组</pre>
+    <ul>
+        <li>如果pid大于零，就使用进程pid；如果pid等于0，就使用当前进程的PID</li>
+        <li>如果pgid大于0，就将对应的进程组ID设置为pgid；如果pgid等于0，就用pid指向的进程的PID作为进程组ID</li>
+    </ul>
+    <h4>用/bin/kill向进程发送任意信号</h4>
+    <p>程序/bin/kill具有以下格式</p>
+    <pre>/bin/kill [-信号编号] id  </pre>
+    <p>
+        当id>0时，表示将信号传递给PID为id的进程；当id&lt;0时，表示将信号传递给进程组ID为|id|的所有进程。
+        比如linux> /bin/kill -9 15213 是把信号9（SIGKILL）发送给进程15213。
+        之所以用完整路径/bin/kill是因为一些Unix shell有内置的kill命令。
+    </p>
+    <h4>从键盘发送信号</h4>
+    <p>
+        通过键盘上输入Ctrl+C会使得内核发送一个SIGINT信号到前台进程组中的所有进程，终止前台作业；
+        通过输入Ctrl+Z会发送一个SIGTSTP信号到前台进程组的所有进程，停止前台作业，直到该进程收到SIGCONT信号。
+    </p>
+    <h4>用kill函数发送信号</h4>
+    <pre>#include &lt;sys/types.h>
+#include &lt;signal.h>
+int kill(pid_t pid, int sig); </pre>
+    <p>
+        当pid>0时，会将信号sig发送给进程pid；当pid=0时，会将信号sig发送给当前进程所在进程组的所有进程；
+        当pid&lt;0时，会将信号sig发送给进程组ID为|pid|的所有进程。
+    </p>
+    <h4>用alarm函数发送SIGALARM信号</h4>
+    <pre>#include &lt;unistd.h>
+unsigned int alarm(unsigned int secs); </pre>
+    <p>
+        当alarm函数时，会取消待处理的闹钟，返回待处理闹钟剩下的时间，并在secs秒后发送一个SIGALARM信号给当前进程。
+    </p>
+    <h3>8.4.3 接收信号</h3>
+    <p>
+        当内核把进程p从内核模式切换回用户模式时，比如从系统调用返回或完成了一次上下文切换时，会检查进程p的未被阻塞的待处理信号的集合，即pending & ~blocked。
+        如果是空集合，则内核会将控制传递给p的逻辑流中的下一条指令；如果集合非空，则内核会选择集合中编号最小的信号k，强制进程p采取某些行为来接收该信号。
+        对该集合中的所有信号都重复这个操作，直到集合为空。此时内核再将控制传递回p的逻辑流中的下一条指令。
+    </p>
+    <p>每种信号类型具有以下一种预定的默认行为：</p>
+    <ul>
+        <li>进程终止</li>
+        <li>进程终止并dumps core</li>
+        <li>进程挂起直到被SIGCONT信号重启</li>
+        <li>进程忽略信号</li>
+    </ul>
+    <p>我们这里可以通过signal函数来修改信号的默认行为，但是无法修改SIGSTOP和SIGKILL信号的默认行为</p>
+    <pre>#include &lt;signal.h>
+typedef void (*sighandler_t)(int); 
+sighandler_t signal(int signum, sighandler_t handler);</pre>
+    <p>
+        typedef定义了一种sighandler_t类型,它是一种函数指针，指向的函数接受一个整型参数并返回一个无类型指针。signum为信号编号，可以直接输入信号名称，如SIGINT等。handler为我们想要对信号signum采取的行为，有以下三种：
+    </p>
+    <ul>
+        <li>当handler为SIG_IGN，表示要进程忽略该信号</li>
+        <li>当handler为SIG_DFL，表示要恢复该信号的默认行为</li>
+        <li>当handler为用户自定义的信号处理程序地址，则会调用该函数来处理该信号。该函数原型为void signal_handler(int sig);。
+            利用signal函数修改信号默认行为叫做install handler；调用信号处理程序称为捕获（catch）信号；执行信号处理程序称为处理（handle）信号。
+            当信号处理程序返回时，通常会将控制传递回逻辑流之前被信号中断的指令。之所以说通常是因为信号处理程序可以被别的信号处理程序中断。</li>
+    </ul>
+    <p>例子：</p>
+    <pre>#include "csapp.h"
+void sigint_handler(int sig)
+{
+    printf("Caught SIGINT!\n");
+}
+int main()
+{
+    if(signal(SIGINT, sigint_handler) == SIG_ERR)
+        unix_error("signal error");
+    pause(); //wait for the receipt of a signal
+    return 0;
+}</pre>
+    <p>
+        默认情况下键盘输入Ctrl+C后，进程会捕获信号SIGINT，它的默认行为是立即终止进程。在上面的例子中，我们修改了默认的行为，先输出一条信息，再终止。
+        通常来说，install一次handler后，以后的默认行为都会改变，但是旧的Unix系统在改变一次行为之后会再次恢复默认行为。
+    </p>
+    <h3>8.4.4 阻塞信号</h3>
+    <p>Linux提供阻塞信号的隐式和显示的机制：</p>
+    <ul>
+        <li>隐式阻塞机制：内核默认阻塞当前正在处理信号类型的待处理信号。</li>
+        <li>显示阻塞机制：应用程序通过sigprocmask函数来显示阻塞和解阻塞选定的信号。</li>
+    </ul>
+    <pre>#include &lt;signal.h>
+int sigprocmask(int how, const sigset_t *set, 
+                sigset_t *oldset);</pre>
+    <ul>
+        <li>通过how来决定如何改变阻塞的信号集合blocked</li>
+        <ul>
+            <li>当how=SIG_BLOCK时，blocked = blocked | set</li>
+            <li>当how=SIG_UNBLOCK时，blocked = blocked & ~set</li>
+            <li>当how=SETMASK时，block = set</li>
+        </ul>
+        <li>如果oldset非空，则会将原始的blocked位向量(blocked bit vector也称作signal mask)中的值保存在oldset中，用于恢复原始的阻塞信号集合</li>
+    </ul>
+    <p>这里还提供一些额外的函数来对set信号集合进行操作</p>
+    <pre>#include &lt;signal.h>
+//初始化set为空集合
+int sigemptyset(sigset_t *set); 
+//把每个信号都添加到set中
+int sigfillset(sigset_t *set); 
+//将signum信号添加到set中
+int sigaddset(sigset_t *set, int signum); 
+//将signum从set中删除
+int sigdelset(sigset_t *set, int signum); 
+//如果signum是set中的成员，则返回1，否则返回0
+int sigismember(const sigset_t *set, int signum); </pre>
+    <p>以下是一个使用例子</p>
+    <pre>sigset_t mask, prev_mask;
+Sigemptyset(&mask);
+Sigaddset(&mask, SIGINT);
+/* Block SIGINT and save previous blocked set */
+Sigprocmask(SIG_BLOCK. &mask, &prev_mask);
+.
+. //Code region that will not be interrupted by SIGINT
+.
+/* Restore previous blocked set, unblocking SIGINT */
+Sigprocmask(SIG_SETMASK, &prev_mask, NULL);</pre>
+    <p>以上执行内部函数时，就不会接收到SIGINT信号，即不会被Ctrl+C终止。可以通过阻塞信号来消除函数冲突，或者保证程序运行逻辑正确。</p>
+    <h3>8.4.5 其他</h3>
+    <p>
+        接下来csapp花了许多笔墨讨论如何写安全、正确以及可移植性好的信号处理程序。然后再讨论了如何利用阻塞信号来解决处理程序和主程序并发运行造成的错误。
+        这些细节还是要等自己写个shell摸索摸索，这里就略去。
+    </p>
+
+    <h2>8.5 非本地跳转</h2>
+    <p>
+        C语言提供了一种用户级异常控制流形式，称为非本地跳转（Nonlocal Jmup）。
+        它可以直接将控制从一个函数转移到另一个当前正在执行的函数，不需要经过调用-返回。
+    </p>
+    <p>这里需要两个函数</p>
+    <pre>#include &lt;setjmp.h>
+int setjmp(jmp_buf env);
+void longjmp(jmp_buf env, int retval);</pre>
+    <p>
+        setjmp函数把当前的调用环境存在env中，并且返回0。调用环境包括PC、栈指针和通用目的寄存器。
+        然后我们在代码某处调用longjmp(env, retval)，会从env中恢复调用环境，并跳转到最近一次初始化env的setjmp函数，让setjmp函数返回retval，longjump函数没有返回值。
+    </p>
+    <p>
+        注意：setjmp的返回值不能赋给变量（for subtle reason beyond our scope），但是可以作为switch的条件。
+    </p>
+    <p>接下来介绍非本地跳转的两个应用</p>
+    <h3>8.5.1 无需解析调用栈，直接从深层嵌套函数中返回</h3>
+    <p class="center"><img src="../../pic/csapp/nonlocaljump1.jpg" alt=""></p>
+    <p>
+        首先在12行中执行setjmp(buf)函数将当前调用环境保存到buf中，并返回0，所以就调用foo函数。如果foo函数出现了error1错误，则通过longjmp(buf, 1)恢复调用环境，并跳转回第13行，后让setjmp函数返回1，进入case1。
+        如果没有出现error1错误，但是foo函数接下来调用的bar函数出现了error2错误，则通过longjmp(buf, 2)恢复调用环境，并跳转回第13行，然后让setjmp函数返回2，进入case2。
+        由此就无需解析调用栈了。但是该方法可能存在内存泄露问题。<!--好吧，所以什么是解析调用栈呀-->
+    </p>
+    <h3>8.5.2 控制信号处理程序结束后的位置</h3>
+    <p>在信号处理中也有对应的两个非本地跳转的函数</p>
+    <pre>#include &lt;setjmp.h>
+int sigsetjmp(sigjmp_buf env, int savesigs);
+void siglongjmp(sigjmp_buf env, int retval); </pre>
+    <p>
+        注意：当sigsetjmp函数中savesigs非零时，当前的pending和blocked位向量才会存在env中。其余与setjmp和longjmp类似。
+    </p>
+    <p class="center"><img src="../../pic/csapp/nonlocaljump2.jpg" alt=""></p>
+    <p>
+        首先第12行通过sigsetjmp函数将调用环境保存到buf中，并返回0，随后设置信号处理程序。
+        当用户输入Ctrl+C时，会调用信号处理程序handler，并通过siglongjmp恢复调用环境，然后跳转回第12行。
+        再让sigsetjmp返回1。这便避免了返回到中断的下一条指令处。
+    </p>
+    <p>程序运行结果类似于：</p>
+    <pre>linux> ./restart
+starting
+processing...
+processing...
+processing...
+Ctrl+C
+restarting
+processing...</pre>
+    <p>PS：图中的Sio_put函数是csapp.h中定义的一个安全的输出函数。没错printf不安全。。。</p>
+
+    <footer>
+        &copy; 2021, TomatoEater
+        <br>
+        All trademarks and registered trademarks appearing on
+        this site are the property of their respective owners. ( :
+    </footer>
+</body>
+
+</html>
