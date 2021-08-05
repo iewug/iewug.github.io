@@ -400,7 +400,7 @@ int execve(const char *filename, const char *argv[],
     <p>
         execve函数可在当前进程的上下文中加载并运行一个程序。
         execve函数加载并运行filename可执行目标文件，参数列表argv和环境列表envp是以NULL结尾的字符串指针数组，其中argv[0]为文件名。
-        调用exevec函数其实就是调用加载器，则加载器会在可执行目标文件filename的指导下，将文件中的内容复制到代码段和数据段，再调用_libc_start_main来初始化执行环境，调用main函数，main函数的函数原型如下所示
+        调用exevec函数其实就是调用加载器，则加载器会在可执行目标文件filename的指导下，将文件中的内容复制到代码段和数据段，再调用__libc_start_main来初始化执行环境，调用main函数，main函数的函数原型如下所示
     </p>
     <pre>int main(int argc, char *argv[], char *envp[]);</pre>
     <p>
