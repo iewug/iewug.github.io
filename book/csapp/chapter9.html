@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter9</title>
+    <link rel="stylesheet" type="text/css" href="../../main.css" media="screen and (min-width: 481px)">
+    <link rel="stylesheet" type="text/css" href="../../main-mobile.css" media="screen and (max-width: 480px)">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="../../index.html">主页</a></li>
+            <li><a href="../../about.html">关于</a></li>
+            <li class="selected"><a href="../../note.html">笔记</a></li>
+            <li><a href="../../science.html">杂记</a></li>
+            <li><a href="../../lab.html">实验</a></li>
+        </ul>
+    </nav>
+
+    <h1>第九章：虚拟内存</h1>
+    <p>
+        这章看的断断续续，前前后后居然看了一周有余。许多东西似乎看懂了，但是却无法很好的接受。
+        本章内容又多，我又不是很懂，整理就看看别人的吧：
+        <a href="https://zhuanlan.zhihu.com/p/121000009" target="_blank">20[VB]虚拟内存：概念</a>、<a href="https://zhuanlan.zhihu.com/p/122175112" target="_blank">21[VB]虚拟内存：系统</a>、
+        <a href="https://zhuanlan.zhihu.com/p/124286932" target="_blank">22[VB]内存分配：显示分配器</a>、<a href="https://zhuanlan.zhihu.com/p/126295291" target="_blank">23[VB]内存分配：垃圾收集器</a>。
+    </p>
+    <p>
+        不过我还是粗略地谈谈自己的理解。本章主要讨论了两个话题——虚拟内存和动态内存分配。下面分述之。
+    </p>
+    <h2>9.1 虚拟内存</h2>
+    <p>
+        csapp上说虚拟内存是磁盘上一串连续的字节大小的元素。它们可以通过虚拟地址来访问、被缓存在主存之中、被划分成固定大小的虚拟页。物理内存应该就是主存/DRAM了，物理内存被划分成固定大小的物理页。
+        总的来说csapp似乎并没有给出虚拟内存和物理内存清晰的定义，但是个人认为最重要的是下面一个过程：
+    </p>
+    <p class="center"><img src="../../pic/csapp/i7_virtual memory.jpg" alt=""></p>
+    <p>
+        上图所示的是i7处理器数据访问的过程。首先CPU发送一个48位的VA（virtual address虚拟地址），VA被MMU（memory management unit，图中未画出）接收，VA先被分成36位的VPN（virtual page number）和12位的VPO（VP offset）。
+        VPN用来访问缓存在TLB（translation lookaside buffer）的PTE（page table entry）。图中是把VPN分成了32位的TLBT（TLB tag）和4位的TLBI（TLB index）。PTE是一个64位的东西，其中有40位存放着PPN（physical page number），
+        其余位存放着一些如能不能读写之类的限制。如果VPN在TLB中成功找到了有效的PTE，那么就是TLB hit。否则就是TLB miss，此时要把VPN分成9位的VPN1、VPN2、VPN3和VPN4，从主存/缓存/硬盘中再去找到PPN。之所以要把页表分级，
+        是为了让一级页表不这么大。总之现在MMU成功把VA转变成了PA（physical address物理地址）。然后PPO再被分成6位的CI（cache index）和6位的CO（cache offset），而PPN此时变成了CT（cache tag）。
+        如果能在L1 d-cache中找到就是L1 hit，否则就是L1 miss。特别的，如果数据只存放在硬盘中，就会产生page fault exception，需要利用exception handler解决。
+    </p>
+    <p>
+        我大题理解如上，缓存的细节在第六章讨论过，异常在第八章讨论过。
+    </p>
+    <p>
+        下面谈谈个人对为什么要用虚拟地址空间的理解。首先虚拟地址空间让进程认为自己独占了所有的内存，在第八章曾经讨论过私有地址空间的架构，这里的地址就是虚拟地址。而这些有迹可循的虚拟地址通过页表变成的物理地址则是断断续续、无迹可寻的。
+        其次，虚拟地址空间简化加载，想要把可执行目标文件加载到物理内存中，加载器只需要为可执行目标文件中的代码段和数据段分配虚拟页，然后在页表中将这些虚拟页设置为无效的（表示还未缓存），然后将地址字段指向对应的位置。
+    </p>
+    <p>
+        个人这一部分最难接受的就是虚拟内存和物理内存的概念了。有点和虚拟内存空间和物理内存空间混为一谈。
+    </p>
+    <h2>9.2 动态内存分配</h2>
+    <p>
+        动态内存分配便是在堆空间里分配地址了。显式动态分配器（Explicit Allocator）就是我们熟悉的malloc和free函数；隐式动态分配器（Implicit Allocator）又称垃圾收集器（Garbage Collector），是一种自动回收动态内存的工具，显然c与c++没有。
+        csapp中把堆空间分成了许多堆块，堆块又认为构成了空闲链表（free list）。csapp花了许多笔墨讲述隐式空闲链表（implicit free list）。讲如何分配内存（first fit、best fit），如何合并空闲的块。
+        可是归根到底，我难以理解堆块组成了链表？而且这里所谓的链表应该是数组的数据结构吧？
+    </p>
+    <p>
+        至于垃圾收集csapp讲了Mark&Sweep算法，大体上就是mark了所有可被程序访问的块，再在空闲链表中遍历一下，把那些没有被mark但是被allocate的块给free掉。
+    </p>
+    <p>
+        总的来说，并不能很好地接受这章的知识。。。不过在操作系统的课程中，虚拟内存将是一个重要的话题。想必届时会有更深的理解。
+    </p>
+
+
+
+    <footer>
+        &copy; 2021, TomatoEater_(:з」∠)_
+        <br>
+        All trademarks and registered trademarks appearing on
+        this site are the property of their respective owners. ( :
+    </footer>
+</body>
+
+</html>
