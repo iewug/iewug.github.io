@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter10-12</title>
+    <link rel="stylesheet" type="text/css" href="../../main.css" media="screen and (min-width: 481px)">
+    <link rel="stylesheet" type="text/css" href="../../main-mobile.css" media="screen and (max-width: 480px)">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="../../index.html">主页</a></li>
+            <li><a href="../../about.html">关于</a></li>
+            <li class="selected"><a href="../../note.html">笔记</a></li>
+            <li><a href="../../science.html">杂记</a></li>
+            <li><a href="../../lab.html">实验</a></li>
+        </ul>
+    </nav>
+
+    <h1>第三部分：程序间的交互和通信</h1>
+    <p>
+        暑假将尽，尽显疲态。已经失去两个月前读csapp的热情了。最后三章全是调用api，来实现文件的读写、网络编程以及并发编程。
+        这些api大多复杂的很，要掌握需要长期的实践。本人并没有掌握这些函数，甚至萌发了整理烂尾的念头。最后还是做个妥协，在此讲一讲两个重要概念。
+    </p>
+    <h2>套接字（socket）</h2>
+    <p>
+        这是一个奇怪的东西。csapp是这么解释套接字的：站在Linux内核的角度，套接字是通信的端；站在Linux程序的角度，套接字是一个有程序描述符的打开的文件。
+        反正套接字就是一个不直观的概念。第十一章利用套接字的接口函数，写出来了一个echo客户端和服务器以及一个web服务器。echo客户端和服务器我尝试研读了一下代码，
+        大体上理解了一下。简单来说就是，打开两个终端A和B；在终端A运行服务器程序设置一个localhost的端口作为监听套接字端口，在终端B运行客户端程序链接刚刚设置的端口；
+        于是在终端B发送的信息会通过终端A再次返回到终端B上，而终端A会显示传送多少数据的信息。而web服务器的代码实在是不想看了。。。
+    </p>
+    <h2>线程（thread）</h2>
+    <p>
+        就看看这个<a href="https://b23.tv/FmYwUP" target="_blank">进程与线程-哔哩哔哩</a>吧。csapp第十二章其实介绍了三种并发编程的策略：1）利用显式的IPC机制在进程中分享数据，但是进程间的转换速度慢；
+        2）利用IO多路复用实现，只需一个进程，但是具有调度复杂等问题；3）利用线程实现，调度由内核自发进行，又只需一个进程。第十二章接下来又介绍了许多并发编程会遇到的问题，讲了信号量、锁等概念（我都看不下去）。
+        总的来说，csapp也只是给读者一些初步认知罢了，在操作系统的书中将会有更多的认识的。
+    </p>
+
+    <footer>
+        &copy; 2021, TomatoEater
+        <br>
+        All trademarks and registered trademarks appearing on
+        this site are the property of their respective owners. ( :
+    </footer>
+</body>
+
+</html>
