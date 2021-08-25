@@ -1,33 +1,12 @@
-<!--为什么要去掉<!DOCTYPE html>才行-->
+<!DOCTYPE html>
 <html lang="zh">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>浪里个浪</title>
+    <title>震惊，据说99%的人都没有看过</title>
     <link rel="stylesheet" type="text/css" href="main.css" media="screen and (min-width: 481px)">
     <link rel="stylesheet" type="text/css" href="main-mobile.css" media="screen and (max-width: 480px)">
-    <script>
-        var xleft = 0;
-        var ytop = 0;
-        var movex = 1.5;
-        var movey = 1.5;
-        function move() {
-            xleft += movex;
-            ytop += movey;
-            var xgg = document.getElementById("xgg");
-            xgg.style.top = ytop;
-            xgg.style.left = xleft;
-            if (xleft + xgg.offsetWidth >= document.body.clientWidth || xleft <= 0) {
-                movex = -movex;
-            }
-            if (ytop + xgg.offsetHeight >= document.body.clientHeight || ytop <= 0) {
-                movey = -movey;
-            }
-
-        }
-        setInterval(move, 10);
-    </script>
 </head>
 
 <body>
@@ -40,28 +19,41 @@
             <li class="selected">实验</li>
         </ul>
     </nav>
+
+    <ul class="ulNoStyle">
+        <li>
+            <a href="pic/送花.gif" title="送花" onclick="showPic(this); return false;">送花</a>
+        </li>
+        <li>
+            <a href="pic/出来玩.gif" title="出来玩" onclick="showPic(this); return false;">出来玩</a>
+        </li>
+        <li>
+            <a href="pic/呼啦圈.gif" title="转呼啦圈" onclick="showPic(this); return false;">呼啦圈</a>
+        </li>
+        <li>
+            <a href="pic/来吧.gif" title="重置" onclick="showPic(this); return false;">重置</a>
+        </li>
+    </ul>
+
+    <p id="description">👆任选一个，看高清基艾艾弗图</p>
+    <img id="placeholder" src="pic/来吧.gif" alt="">
+    
     <p>
-        <audio autoplay="autoplay" src="music/翻身的日子.m4a">翻身的日子</audio>
+        <button onclick="reset()">真·重置</button>
     </p>
-    <div id="xgg" style="position: absolute;left: 0px;top: 0;">
-        <strong>
-            <pre>
-            　☆ *　. 　☆
-            　　. ∧＿∧　∩　* ☆ 小朋友放假啦！！！
-            * ☆ ( ・∀・)/ .
-            　. ⊂　　 ノ* ☆
-            ☆ * (つ ノ .☆
-            　　 (ノ
-        </pre>
-        </strong>
-    </div>
-    <p class="center"><img src="pic/出来玩.gif" alt=""></p>
+
+    <p>
+        <audio autoplay="autoplay" src="music/love you like the movies.m4a">翻身的日子</audio>
+    </p>
+    
     <footer>
         &copy; 2021, TomatoEater
         <br>
         All trademarks and registered trademarks appearing on
         this site are the property of their respective owners. ( :
     </footer>
+
+    <script src="showPic.js"></script> <!--注意script标签放的位置-->
 </body>
 
 </html>

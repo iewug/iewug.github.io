@@ -95,3 +95,19 @@ img {
     height: auto;
     max-width: 100%;
 }
+
+.ulNoStyle {
+    list-style-type: none;
+    margin: 0px;
+    padding: 0px;
+}
+
+.ulNoStyle li{
+    display: inline;
+    font-size: xx-large;
+}
+
+.ulNoStyle a {
+    text-decoration: none;
+    font-weight: bold;
+}
