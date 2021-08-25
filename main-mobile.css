@@ -83,9 +83,9 @@ img {
     padding: 0px;
 }
 
-.ulNoStyle li{
+.ulNoStyle li {
     display: inline;
-    font-size: xx-large;
+    font-size: large;
 }
 
 .ulNoStyle a {
