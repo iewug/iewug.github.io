@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>震惊，据说99%的人都没有看过</title>
+    <title>结构样式行为彻底分离的showPic</title>
     <link rel="stylesheet" type="text/css" href="main.css" media="screen and (min-width: 481px)">
     <link rel="stylesheet" type="text/css" href="main-mobile.css" media="screen and (max-width: 480px)">
 </head>
@@ -20,30 +20,25 @@
         </ul>
     </nav>
 
-    <ul class="ulNoStyle">
+    <ul class="ulNoStyle" id="imagegallery">
         <li>
-            <a href="pic/送花.gif" title="送花" onclick="showPic(this); return false;">送花</a>
+            <a href="pic/送花.gif" title="送花">送花</a>
         </li>
         <li>
-            <a href="pic/出来玩.gif" title="出来玩" onclick="showPic(this); return false;">出来玩</a>
+            <a href="pic/出来玩.gif" title="出来玩">出来玩</a>
         </li>
         <li>
-            <a href="pic/呼啦圈.gif" title="转呼啦圈" onclick="showPic(this); return false;">呼啦圈</a>
+            <a href="pic/呼啦圈.gif" title="转呼啦圈">呼啦圈</a>
         </li>
         <li>
-            <a href="pic/来吧.gif" title="重置" onclick="showPic(this); return false;">重置</a>
+            <a href="pic/来吧.gif" title="重置">重置</a>
         </li>
     </ul>
 
-    <p id="description">👆任选一个，看高清基艾艾弗图</p>
-    <img id="placeholder" src="pic/来吧.gif" alt="">
-    
-    <p>
-        <button onclick="reset()">真·重置</button>
-    </p>
+    <!--利用js来实现description和placeholder，而不是html-->
 
     <p>
-        <audio autoplay="autoplay" src="music/love you like the movies.m4a">翻身的日子</audio>
+        <button onclick="reset()">真·重置</button>
     </p>
     
     <footer>
@@ -53,7 +48,7 @@
         this site are the property of their respective owners. ( :
     </footer>
 
-    <script src="showPic.js"></script> <!--注意script标签放的位置-->
+    <script src="final_showPic.js"></script> <!--注意script标签放的位置-->
 </body>
 
 </html>

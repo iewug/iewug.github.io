@@ -85,6 +85,7 @@ img {
 
 .ulNoStyle li {
     display: inline;
+    font-size: medium;
 }
 
 .ulNoStyle a {
