@@ -71,6 +71,10 @@ footer {
     text-align: center;
 }
 
+.right {
+    text-align: right;
+}
+
 .line-through {
     text-decoration: line-through;
 }
